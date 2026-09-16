@@ -1,3 +1,4 @@
+// src/screens/AccueilScreen.tsx
 import { useState, useCallback } from 'react';
 import {
   View,
@@ -54,7 +55,10 @@ export default function AccueilScreen() {
           <Text style={styles.vide}>Aucun chant pour l'instant.</Text>
         }
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.ligneChant}>
+          <TouchableOpacity
+            style={styles.ligneChant}
+            onPress={() => navigation.navigate('DetailChant', { chantId: item.id })}
+          >
             {item.imageUri ? (
               <Image source={{ uri: item.imageUri }} style={styles.miniature} />
             ) : (
