@@ -18,7 +18,14 @@ export default function AccueilScreen() {
         style={styles.bouton}
         onPress={() => navigation.navigate('Categories')}
       >
-        <Text style={styles.texteBouton}>📁 Gérer les catégories</Text>
+        <Text style={styles.texteBouton}>Gérer les catégories</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.bouton}
+        onPress={() => navigation.navigate('AjoutChant')}
+      >
+        <Text style={styles.texteBouton}>Ajouter un chant</Text>
       </TouchableOpacity>
     </View>
   );

@@ -16,7 +16,10 @@ export async function initDossiersFichiers(): Promise<void> {
   }
 }
 
-export async function copierFichierAudio(uriOrigine: string, nomOriginal: string): Promise<string> {
+export async function copierFichierAudio(
+    uriOrigine: string, 
+    nomOriginal: string
+): Promise<string> {
   const extension = nomOriginal.split('.').pop() ?? 'mp3';
   const nomUnique = `${Date.now()}.${extension}`;
   const destination = `${DOSSIER_AUDIO}${nomUnique}`;
@@ -25,7 +28,9 @@ export async function copierFichierAudio(uriOrigine: string, nomOriginal: string
   return destination;
 }
 
-export async function copierImage(uriOrigine: string): Promise<string> {
+export async function copierImage(
+    uriOrigine: string
+): Promise<string> {
   const nomUnique = `${Date.now()}.jpg`;
   const destination = `${DOSSIER_IMAGES}${nomUnique}`;
 
@@ -33,7 +38,10 @@ export async function copierImage(uriOrigine: string): Promise<string> {
   return destination;
 }
 
-export async function supprimerFichier(uri: string | null): Promise<void> {
+// Supprime un fichier 
+export async function supprimerFichier(
+    uri: string | null
+): Promise<void> {
   if (!uri) return;
   const info = await FileSystem.getInfoAsync(uri);
   if (info.exists) {
