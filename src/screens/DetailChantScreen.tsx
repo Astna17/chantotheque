@@ -4,6 +4,7 @@ import { useFocusEffect, useRoute, RouteProp } from '@react-navigation/native';
 import { getChantDetail } from '../database/chants';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { ChantDetail } from '../types';
+import LecteurAudio from '../components/LecteurAudio';
 
 type DetailChantRouteProp = RouteProp<RootStackParamList, 'DetailChant'>;
 
@@ -38,9 +39,7 @@ export default function DetailChantScreen() {
       {chant.auteur && <Text style={styles.auteur}>{chant.auteur}</Text>}
 
       {/* Le lecteur audio viendra ici à l'étape suivante */}
-      <View style={styles.placeholderLecteur}>
-        <Text style={styles.placeholderTexte}>▶ Lecteur audio (bientôt)</Text>
-      </View>
+      <LecteurAudio uriAudio={chant.audioUri} titre={chant.titre} />
 
       {chant.paroles && (
         <View style={styles.section}>
