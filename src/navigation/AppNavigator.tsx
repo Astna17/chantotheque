@@ -9,7 +9,7 @@ import DetailChantScreen from '../screens/DetailChantScreen';
 export type RootStackParamList = {
   Accueil: undefined;
   Categories: undefined;   
-  AjoutChant: undefined; 
+  AjoutChant: { chantId?: number } | undefined; 
   DetailChant: { chantId: number }; 
 };
 

@@ -1,3 +1,4 @@
+// src/screens/AjoutChantScreen.tsx
 import { useState, useCallback } from 'react';
 import {
   View,
@@ -9,22 +10,29 @@ import {
   Alert,
   Image,
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { getCategories } from '../database/categories';
-import { creerChant, lierVerset } from '../database/chants';
+import { creerChant, modifierChant, getChantDetail, lierVerset, delierVerset } from '../database/chants';
 import { getOuCreerVerset } from '../database/versets';
 import { copierFichierAudio, copierImage } from '../database/fichier';
 import { Categorie } from '../types';
+import { RootStackParamList } from '../navigation/AppNavigator';
 
 interface VersetTemporaire {
+  id?: number; 
   reference: string;
   texte: string;
 }
 
+type AjoutChantRouteProp = RouteProp<RootStackParamList, 'AjoutChant'>;
+
 export default function AjoutChantScreen() {
   const navigation = useNavigation();
+  const route = useRoute<AjoutChantRouteProp>();
+  const chantIdEnEdition = route.params?.chantId ?? null;
+  const modeEdition = chantIdEnEdition !== null;
 
   const [categories, setCategories] = useState<Categorie[]>([]);
   const [titre, setTitre] = useState('');
@@ -38,15 +46,37 @@ export default function AjoutChantScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
 
   const [versets, setVersets] = useState<VersetTemporaire[]>([]);
+  const [versetsSupprimesIds, setVersetsSupprimesIds] = useState<number[]>([]);
   const [referenceEnCours, setReferenceEnCours] = useState('');
   const [texteEnCours, setTexteEnCours] = useState('');
 
   const [enregistrement, setEnregistrement] = useState(false);
+  const [chargementInitial, setChargementInitial] = useState(modeEdition);
 
   useFocusEffect(
     useCallback(() => {
       setCategories(getCategories());
     }, [])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (modeEdition && chantIdEnEdition !== null) {
+        const chant = getChantDetail(chantIdEnEdition);
+        if (chant) {
+          setTitre(chant.titre);
+          setAuteur(chant.auteur ?? '');
+          setCategorieId(chant.categorieId);
+          setParoles(chant.paroles ?? '');
+          setSolfege(chant.solfege ?? '');
+          setAudioUri(chant.audioUri);
+          setAudioNom('Fichier audio actuel');
+          setImageUri(chant.imageUri);
+          setVersets(chant.versets.map((v) => ({ id: v.id, reference: v.reference, texte: v.texte })));
+        }
+        setChargementInitial(false);
+      }
+    }, [modeEdition, chantIdEnEdition])
   );
 
   async function choisirAudio() {
@@ -87,6 +117,10 @@ export default function AjoutChantScreen() {
   }
 
   function supprimerVersetTemporaire(index: number) {
+    const verset = versets[index];
+    if (verset.id) {
+      setVersetsSupprimesIds([...versetsSupprimesIds, verset.id]);
+    }
     setVersets(versets.filter((_, i) => i !== index));
   }
 
@@ -108,25 +142,58 @@ export default function AjoutChantScreen() {
 
     setEnregistrement(true);
     try {
-      const audioUriFinal = await copierFichierAudio(audioUri, audioNom ?? 'audio.mp3');
-      const imageUriFinal = imageUri ? await copierImage(imageUri) : null;
+      // Si l'audio/image a été changé (nouvelle sélection), on copie le nouveau fichier.
+      // Si c'est l'ancien chemin déjà stocké (mode édition sans changement), on le garde tel quel.
+      const audioDejaDansApp = audioUri.includes('/audio/');
+      const imageDejaDansApp = imageUri?.includes('/images/') ?? false;
 
-      const chantId = creerChant({
-        titre: titrePropre,
-        auteur: auteur.trim() || null,
-        categorieId,
-        audioUri: audioUriFinal,
-        imageUri: imageUriFinal,
-        paroles: paroles.trim() || null,
-        solfege: solfege.trim() || null,
-      });
+      const audioUriFinal = audioDejaDansApp
+        ? audioUri
+        : await copierFichierAudio(audioUri, audioNom ?? 'audio.mp3');
 
+      const imageUriFinal = imageUri
+        ? imageDejaDansApp
+          ? imageUri
+          : await copierImage(imageUri)
+        : null;
+
+      let chantId: number;
+
+      if (modeEdition && chantIdEnEdition !== null) {
+        modifierChant(chantIdEnEdition, {
+          titre: titrePropre,
+          auteur: auteur.trim() || null,
+          categorieId,
+          audioUri: audioUriFinal,
+          imageUri: imageUriFinal,
+          paroles: paroles.trim() || null,
+          solfege: solfege.trim() || null,
+        });
+        chantId = chantIdEnEdition;
+
+        // On délie les versets retirés par l'utilisateur
+        for (const versetId of versetsSupprimesIds) {
+          delierVerset(chantId, versetId);
+        }
+      } else {
+        chantId = creerChant({
+          titre: titrePropre,
+          auteur: auteur.trim() || null,
+          categorieId,
+          audioUri: audioUriFinal,
+          imageUri: imageUriFinal,
+          paroles: paroles.trim() || null,
+          solfege: solfege.trim() || null,
+        });
+      }
+
+      // On (re)lie tous les versets actuellement dans la liste
       for (const v of versets) {
         const versetId = getOuCreerVerset(v.reference, v.texte);
         lierVerset(chantId, versetId);
       }
 
-      Alert.alert('Succès', 'Le chant a été ajouté.');
+      Alert.alert('Succès', modeEdition ? 'Le chant a été modifié.' : 'Le chant a été ajouté.');
       navigation.goBack();
     } catch (e) {
       Alert.alert('Erreur', "Une erreur s'est produite lors de l'enregistrement.");
@@ -134,6 +201,14 @@ export default function AjoutChantScreen() {
     } finally {
       setEnregistrement(false);
     }
+  }
+
+  if (chargementInitial) {
+    return (
+      <View style={styles.centre}>
+        <Text>Chargement...</Text>
+      </View>
+    );
   }
 
   return (
@@ -232,7 +307,7 @@ export default function AjoutChantScreen() {
         disabled={enregistrement}
       >
         <Text style={styles.texteBoutonEnregistrer}>
-          {enregistrement ? 'Enregistrement...' : 'Enregistrer'}
+          {enregistrement ? 'Enregistrement...' : modeEdition ? 'Enregistrer les modifications' : 'Enregistrer'}
         </Text>
       </TouchableOpacity>
     </ScrollView>
@@ -241,6 +316,7 @@ export default function AjoutChantScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  centre: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 14, fontWeight: '600', marginTop: 16, marginBottom: 6 },
   input: {
     borderWidth: 1,
