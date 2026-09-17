@@ -1,4 +1,3 @@
-// src/screens/AjoutChantScreen.tsx
 import { useState, useCallback } from 'react';
 import {
   View,
@@ -144,8 +143,8 @@ export default function AjoutChantScreen() {
     try {
       // Si l'audio/image a été changé (nouvelle sélection), on copie le nouveau fichier.
       // Si c'est l'ancien chemin déjà stocké (mode édition sans changement), on le garde tel quel.
-      const audioDejaDansApp = audioUri.includes('/audio/');
-      const imageDejaDansApp = imageUri?.includes('/images/') ?? false;
+      const audioDejaDansApp = !!audioUri && audioUri.includes('/audio/');
+      const imageDejaDansApp = !!imageUri && imageUri.includes('/images/');
 
       const audioUriFinal = audioDejaDansApp
         ? audioUri
