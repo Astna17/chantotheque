@@ -4,6 +4,7 @@ import AccueilScreen from '../screens/AccueilScreen';
 import CategoriesScreen from '../screens/CategoriesScreen';
 import AjoutChantScreen from '../screens/AjoutChantScreen';
 import DetailChantScreen from '../screens/DetailChantScreen';
+import ChantsCategorieScreen from '../screens/ChantsCategorieScreen';
 
 //ici tous les écrans de l'app 
 export type RootStackParamList = {
@@ -11,6 +12,7 @@ export type RootStackParamList = {
   Categories: undefined;   
   AjoutChant: { chantId?: number } | undefined; 
   DetailChant: { chantId: number }; 
+  ChantsCategorie: {categorieId: number; categorieNom: string};
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -38,6 +40,13 @@ export default function AppNavigator() {
           name="DetailChant"
           component={DetailChantScreen}
           options={{ title: 'Détails du chant' }}
+        />
+        <Stack.Screen
+          name="ChantsCategorie"
+          component={ChantsCategorieScreen}
+          options={({ route }) => ({
+            title: route.params.categorieNom
+          })}
         />
       </Stack.Navigator>
     </NavigationContainer>

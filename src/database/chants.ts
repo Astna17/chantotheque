@@ -11,6 +11,21 @@ export interface NouveauChant {
   solfege: string | null;
 }
 
+// Petit bout de SQL réutilisé partout, qui renomme les colonnes en camelCase
+const SELECT_CHANT = `
+  SELECT
+    id,
+    titre,
+    auteur,
+    categorie_id AS categorieId,
+    audio_uri AS audioUri,
+    image_uri AS imageUri,
+    paroles,
+    solfege,
+    date_ajout AS dateAjout
+  FROM chants
+`;
+
 export function creerChant(chant: NouveauChant): number {
   const result = db.runSync(
     `INSERT INTO chants (titre, auteur, categorie_id, audio_uri, image_uri, paroles, solfege)
@@ -29,12 +44,12 @@ export function creerChant(chant: NouveauChant): number {
 }
 
 export function getChants(): Chant[] {
-  return db.getAllSync<Chant>('SELECT * FROM chants ORDER BY date_ajout DESC;');
+  return db.getAllSync<Chant>(`${SELECT_CHANT} ORDER BY date_ajout DESC;`);
 }
 
 export function getChantsParCategorie(categorieId: number): Chant[] {
   return db.getAllSync<Chant>(
-    'SELECT * FROM chants WHERE categorie_id = ? ORDER BY titre ASC;',
+    `${SELECT_CHANT} WHERE categorie_id = ? ORDER BY titre ASC;`,
     [categorieId]
   );
 }
@@ -42,13 +57,13 @@ export function getChantsParCategorie(categorieId: number): Chant[] {
 export function rechercherChants(texte: string): Chant[] {
   const motif = `%${texte}%`;
   return db.getAllSync<Chant>(
-    `SELECT * FROM chants WHERE titre LIKE ? OR auteur LIKE ? ORDER BY titre ASC;`,
+    `${SELECT_CHANT} WHERE titre LIKE ? OR auteur LIKE ? ORDER BY titre ASC;`,
     [motif, motif]
   );
 }
 
 export function getChantDetail(id: number): ChantDetail | null {
-  const chant = db.getFirstSync<Chant>('SELECT * FROM chants WHERE id = ?;', [id]);
+  const chant = db.getFirstSync<Chant>(`${SELECT_CHANT} WHERE id = ?;`, [id]);
   if (!chant) return null;
 
   const categorie = chant.categorieId
@@ -97,7 +112,6 @@ export function lierVerset(chantId: number, versetId: number): void {
   );
 }
 
-// Délier un verset d'un chant
 export function delierVerset(chantId: number, versetId: number): void {
   db.runSync(
     'DELETE FROM chant_versets WHERE chant_id = ? AND verset_id = ?;',

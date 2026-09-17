@@ -145,6 +145,10 @@ export default function AjoutChantScreen() {
       // Si c'est l'ancien chemin déjà stocké (mode édition sans changement), on le garde tel quel.
       const audioDejaDansApp = !!audioUri && audioUri.includes('/audio/');
       const imageDejaDansApp = !!imageUri && imageUri.includes('/images/');
+      console.log('DEBUG audioUri:', audioUri);
+console.log('DEBUG audioDejaDansApp:', audioDejaDansApp);
+console.log('DEBUG imageUri:', imageUri);
+console.log('DEBUG imageDejaDansApp:', imageDejaDansApp);
 
       const audioUriFinal = audioDejaDansApp
         ? audioUri

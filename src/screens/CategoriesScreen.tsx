@@ -8,7 +8,8 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   getCategories,
   creerCategorie,
@@ -16,14 +17,17 @@ import {
   supprimerCategorie,
 } from '../database/categories';
 import { Categorie } from '../types';
+import { RootStackParamList } from '../navigation/AppNavigator';
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Categories'>;
 
 export default function CategoriesScreen() {
+  const navigation = useNavigation<NavigationProp>();
   const [categories, setCategories] = useState<Categorie[]>([]);
   const [nouveauNom, setNouveauNom] = useState('');
   const [idEnEdition, setIdEnEdition] = useState<number | null>(null);
   const [nomEdition, setNomEdition] = useState('');
 
-  // Recharge la liste
   useFocusEffect(
     useCallback(() => {
       chargerCategories();
@@ -87,7 +91,6 @@ export default function CategoriesScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Formulaire d'ajout */}
       <View style={styles.formulaire}>
         <TextInput
           style={styles.input}
@@ -100,7 +103,6 @@ export default function CategoriesScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Liste des catégories */}
       <FlatList
         data={categories}
         keyExtractor={(item) => item.id.toString()}
@@ -123,7 +125,17 @@ export default function CategoriesScreen() {
               </>
             ) : (
               <>
-                <Text style={styles.nomCategorie}>{item.nom}</Text>
+                <TouchableOpacity
+                  style={{ flex: 1 }}
+                  onPress={() =>
+                    navigation.navigate('ChantsCategorie', {
+                      categorieId: item.id,
+                      categorieNom: item.nom,
+                    })
+                  }
+                >
+                  <Text style={styles.nomCategorie}>{item.nom}</Text>
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => demarrerEdition(item)} style={styles.boutonPetit}>
                   <Text style={styles.texteBoutonPetit}>✏️</Text>
                 </TouchableOpacity>
@@ -165,7 +177,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  nomCategorie: { flex: 1, fontSize: 16 },
+  nomCategorie: { fontSize: 16 },
   boutonPetit: { paddingHorizontal: 10 },
   texteBoutonPetit: { fontSize: 18 },
   vide: { textAlign: 'center', color: '#999', marginTop: 40 },
