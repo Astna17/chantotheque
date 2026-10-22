@@ -107,3 +107,42 @@ export async function supprimerChant(id: number): Promise<void> {
     id,
   );
 }
+
+export type Verset = {
+  id: number;
+  chant_id: number;
+  reference_biblique: string;
+  texte: string;
+};
+
+export type ChantDetail = Chant & {
+  versets: Verset[];
+};
+
+export async function obtenirChantParId(
+  id: number,
+): Promise<ChantDetail | null> {
+  const db = await getDatabase();
+
+  const chant = await db.getFirstAsync<Chant>(
+    `SELECT * FROM chants WHERE id = ?;`,
+    id,
+  );
+
+  if (!chant) {
+    return null;
+  }
+
+  const versets = await db.getAllAsync<Verset>(
+    `SELECT id, chant_id, reference_biblique, texte
+     FROM versets
+     WHERE chant_id = ?
+     ORDER BY id ASC;`,
+    id,
+  );
+
+  return {
+    ...chant,
+    versets,
+  };
+}

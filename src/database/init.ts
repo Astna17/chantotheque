@@ -1,3 +1,4 @@
+
 import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'chantotheque.db';
@@ -54,4 +55,35 @@ export async function initDatabase(): Promise<void> {
       SELECT 1 FROM schema_version
     );
   `);
+
+  
+  // Vérifier les colonnes réellement présentes dans versets.
+  const colonnes = await db.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(versets);'
+  );
+
+  const nomsColonnes = colonnes.map((colonne) => colonne.name);
+
+  // Ajouter les colonnes manquantes.
+  if (!nomsColonnes.includes('chant_id')) {
+    await db.execAsync(`
+      ALTER TABLE versets
+      ADD COLUMN chant_id INTEGER;
+    `);
+  }
+
+  if (!nomsColonnes.includes('reference_biblique')) {
+    await db.execAsync(`
+      ALTER TABLE versets
+      ADD COLUMN reference_biblique TEXT;
+    `);
+  }
+
+  if (!nomsColonnes.includes('texte')) {
+    await db.execAsync(`
+      ALTER TABLE versets
+      ADD COLUMN texte TEXT;
+    `);
+  }
+
 }

@@ -11,12 +11,17 @@ import { StatusBar } from 'expo-status-bar';
 import { initDatabase } from './src/database/init';
 import BibliothequeScreen from './src/screens/BibliothequeScreen';
 import AjoutChantScreen from './src/screens/AjoutChantScreen';
+import DetailChantScreen from './src/screens/DetailChantScreen';
+
+type Ecran = 'bibliotheque' | 'ajout' | 'detail';
 
 export default function App() {
   const [pret, setPret] = useState(false);
   const [erreur, setErreur] = useState(false);
-  const [ecran, setEcran] = useState<'bibliotheque' | 'ajout'>('bibliotheque');
+
+  const [ecran, setEcran] = useState<Ecran>('bibliotheque');
   const [versionBibliotheque, setVersionBibliotheque] = useState(0);
+  const [chantSelectionneId, setChantSelectionneId] = useState<number | null>(null);
 
   useEffect(() => {
     initDatabase()
@@ -41,7 +46,9 @@ export default function App() {
     return (
       <View style={styles.message}>
         <ActivityIndicator color="#D6B66C" size="large" />
-        <Text style={styles.texte}>Préparation de Chantothèque...</Text>
+        <Text style={styles.texte}>
+          Préparation de Chantothèque...
+        </Text>
       </View>
     );
   }
@@ -49,12 +56,19 @@ export default function App() {
   return (
     <View style={styles.application}>
       <StatusBar style="light" />
-      {ecran === 'bibliotheque' ? (
+
+      {ecran === 'bibliotheque' && (
         <BibliothequeScreen
           key={versionBibliotheque}
           onAjouter={() => setEcran('ajout')}
+          onOuvrirChant={(id) => {
+            setChantSelectionneId(id);
+            setEcran('detail');
+          }}
         />
-      ) : (
+      )}
+
+      {ecran === 'ajout' && (
         <AjoutChantScreen
           onRetour={() => setEcran('bibliotheque')}
           onEnregistre={() => {
@@ -63,12 +77,25 @@ export default function App() {
           }}
         />
       )}
+
+      {ecran === 'detail' && chantSelectionneId !== null && (
+        <DetailChantScreen
+          chantId={chantSelectionneId}
+          onRetour={() => setEcran('bibliotheque')}
+          onChantModifie={() => {
+            setVersionBibliotheque((v) => v + 1);
+          }}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  application: { flex: 1 },
+  application: {
+    flex: 1,
+    backgroundColor: '#101A30',
+  },
   message: {
     flex: 1,
     backgroundColor: '#101A30',
@@ -76,6 +103,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  texte: { color: '#F5F1E8', marginTop: 16 },
-  erreur: { color: '#FF9B9B', textAlign: 'center' },
+  texte: {
+    color: '#F5F1E8',
+    marginTop: 16,
+  },
+  erreur: {
+    color: '#FF9B9B',
+    textAlign: 'center',
+  },
 });
