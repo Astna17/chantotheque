@@ -21,12 +21,15 @@ type Props = {
   onChantModifie: () => void;
 };
 
+type Onglet = 'paroles' | 'partition' | 'versets';
+
 const C = {
   fond: '#101A30',
   carte: '#263752',
   or: '#D6B66C',
   ivoire: '#F5F1E8',
   secondaire: '#C3CBDA',
+  piste: '#43536B',
 };
 
 export default function DetailChantScreen({
@@ -36,6 +39,7 @@ export default function DetailChantScreen({
   const [chant, setChant] = useState<ChantDetail | null>(null);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(false);
+  const [ongletActif, setOngletActif] = useState<Onglet>('paroles');
 
   const player = useAudioPlayer(null);
   const statut = useAudioPlayerStatus(player);
@@ -52,21 +56,13 @@ export default function DetailChantScreen({
 
         if (actif) {
           setChant(resultat);
-
-          if (!resultat) {
-            setErreur(true);
-          }
+          setErreur(!resultat);
         }
       } catch (error) {
         console.error('Erreur de chargement du chant :', error);
-
-        if (actif) {
-          setErreur(true);
-        }
+        if (actif) setErreur(true);
       } finally {
-        if (actif) {
-          setChargement(false);
-        }
+        if (actif) setChargement(false);
       }
     }
 
@@ -75,7 +71,7 @@ export default function DetailChantScreen({
     return () => {
       actif = false;
     };
-  }, [chantId, player]);
+  }, [chantId]);
 
   useEffect(() => {
     if (!chant?.audio_uri) return;
@@ -84,6 +80,10 @@ export default function DetailChantScreen({
       player.replace({ uri: chant.audio_uri });
     } catch (error) {
       console.error('Erreur de préparation audio :', error);
+      Alert.alert(
+        'Audio indisponible',
+        'Le fichier audio ne peut pas être chargé.',
+      );
     }
   }, [chant?.audio_uri, player]);
 
@@ -94,16 +94,38 @@ export default function DetailChantScreen({
       if (statut.playing) {
         player.pause();
       } else {
+        if (statut.duration > 0 && statut.currentTime >= statut.duration) {
+          player.seekTo(0);
+        }
+
         player.play();
       }
     } catch (error) {
       console.error('Erreur du lecteur audio :', error);
-      Alert.alert('Lecture impossible', 'Impossible de lire ce fichier audio.');
+      Alert.alert(
+        'Lecture impossible',
+        'Impossible de lire ce fichier audio.',
+      );
     }
   }
 
+  function deplacerLecture(secondes: number) {
+    const duree = statut.duration || 0;
+    if (duree <= 0) return;
+
+    const position = Math.max(
+      0,
+      Math.min((statut.currentTime || 0) + secondes, duree),
+    );
+
+    player.seekTo(position);
+  }
+
   function formaterTemps(secondes: number) {
-    const valeur = Number.isFinite(secondes) ? Math.floor(secondes) : 0;
+    const valeur = Number.isFinite(secondes)
+      ? Math.max(0, Math.floor(secondes))
+      : 0;
+
     const minutes = Math.floor(valeur / 60);
     const reste = valeur % 60;
 
@@ -114,7 +136,9 @@ export default function DetailChantScreen({
     return (
       <View style={s.centre}>
         <ActivityIndicator color={C.or} size="large" />
-        <Text style={s.texteChargement}>Chargement du chant...</Text>
+        <Text style={s.texteChargement}>
+          Chargement du chant...
+        </Text>
       </View>
     );
   }
@@ -122,9 +146,17 @@ export default function DetailChantScreen({
   if (erreur || !chant) {
     return (
       <View style={s.centre}>
-        <Text style={s.erreur}>Impossible de charger ce chant.</Text>
-        <TouchableOpacity style={s.boutonRetour} onPress={onRetour}>
-          <Text style={s.texteBoutonRetour}>‹ Retour à la bibliothèque</Text>
+        <Text style={s.erreur}>
+          Impossible de charger ce chant.
+        </Text>
+
+        <TouchableOpacity
+          style={s.boutonRetour}
+          onPress={onRetour}
+        >
+          <Text style={s.texteBoutonRetour}>
+            ‹ Retour à la bibliothèque
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -132,7 +164,9 @@ export default function DetailChantScreen({
 
   const duree = statut.duration || 0;
   const temps = statut.currentTime || 0;
-  const progression = duree > 0 ? Math.min(temps / duree, 1) : 0;
+
+  const progression =
+    duree > 0 ? Math.min(temps / duree, 1) : 0;
 
   return (
     <ScrollView
@@ -140,72 +174,246 @@ export default function DetailChantScreen({
       contentContainerStyle={s.contenu}
       showsVerticalScrollIndicator={false}
     >
-      <TouchableOpacity onPress={onRetour} style={s.retour}>
-        <Text style={s.texteRetour}>‹  Bibliothèque</Text>
+      {/* Navigation retour */}
+      <TouchableOpacity
+        onPress={onRetour}
+        style={s.retour}
+        accessibilityRole="button"
+      >
+        <Text style={s.texteRetour}>
+          ‹  Bibliothèque
+        </Text>
       </TouchableOpacity>
 
+      {/* Pochette du chant */}
       <View style={s.pochette}>
         <Text style={s.iconeMusique}>♫</Text>
+        <Text style={s.textePochette}>
+          CHANTOTHÈQUE
+        </Text>
       </View>
 
+      {/* Informations du chant */}
       <Text style={s.titre}>{chant.titre}</Text>
-      <Text style={s.auteur}>{chant.auteur || 'Auteur inconnu'}</Text>
 
+      <Text style={s.auteur}>
+        {chant.auteur || 'Auteur inconnu'}
+      </Text>
+
+      {/* Lecteur audio */}
       <View style={s.carteLecteur}>
-        <Text style={s.titreSection}>LECTEUR AUDIO</Text>
+        <View style={s.enteteLecteur}>
+          <View>
+            <Text style={s.titreLecteur}>
+              Lecteur audio
+            </Text>
+            <Text style={s.sousTitreLecteur}>
+              Écoute ton chant
+            </Text>
+          </View>
 
-        <TouchableOpacity
-          style={s.boutonLecture}
-          onPress={basculerLecture}
-          accessibilityRole="button"
-          accessibilityLabel={statut.playing ? 'Mettre en pause' : 'Lire le chant'}
-        >
-          <Text style={s.iconeLecture}>
-            {statut.playing ? 'Ⅱ' : '▶'}
-          </Text>
-        </TouchableOpacity>
-
-        <View style={s.piste}>
-          <View style={[s.progression, { width: `${progression * 100}%` }]} />
+          <Text style={s.iconeEntete}>♫</Text>
         </View>
 
-        <View style={s.temps}>
-          <Text style={s.texteTemps}>{formaterTemps(temps)}</Text>
-          <Text style={s.texteTemps}>{formaterTemps(duree)}</Text>
+        <View style={s.commandes}>
+          <TouchableOpacity
+            style={s.boutonSecondaire}
+            onPress={() => deplacerLecture(-10)}
+            accessibilityRole="button"
+            accessibilityLabel="Reculer de 10 secondes"
+          >
+            <Text style={s.iconeSecondaire}>↶</Text>
+            <Text style={s.texteSecondaireBouton}>
+              10 s
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={s.boutonLecture}
+            onPress={basculerLecture}
+            accessibilityRole="button"
+            accessibilityLabel={
+              statut.playing ? 'Mettre en pause' : 'Lire le chant'
+            }
+          >
+            <Text style={s.iconeLecture}>
+              {statut.playing ? 'Ⅱ' : '▶'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={s.boutonSecondaire}
+            onPress={() => deplacerLecture(10)}
+            accessibilityRole="button"
+            accessibilityLabel="Avancer de 10 secondes"
+          >
+            <Text style={s.iconeSecondaire}>↷</Text>
+            <Text style={s.texteSecondaireBouton}>
+              10 s
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Progression audio */}
+        <View style={s.zoneProgression}>
+          <View style={s.piste}>
+            <View
+              style={[
+                s.progression,
+                { width: `${progression * 100}%` },
+              ]}
+            />
+          </View>
+
+          <View style={s.temps}>
+            <Text style={s.texteTemps}>
+              {formaterTemps(temps)}
+            </Text>
+
+            <Text style={s.texteTemps}>
+              {formaterTemps(duree)}
+            </Text>
+          </View>
         </View>
       </View>
 
-      <View style={s.section}>
-        <Text style={s.titreSection}>PAROLES</Text>
-        <Text style={s.paroles}>
-          {chant.paroles?.trim() || 'Aucune parole enregistrée pour ce chant.'}
-        </Text>
-      </View>
+      {/* Onglets horizontaux */}
+      <View style={s.zoneContenu}>
+        <View style={s.onglets}>
+          <TouchableOpacity
+            style={[
+              s.onglet,
+              ongletActif === 'paroles' && s.ongletSelectionne,
+            ]}
+            onPress={() => setOngletActif('paroles')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: ongletActif === 'paroles' }}
+          >
+            <Text style={s.iconeOnglet}>♫</Text>
+            <Text
+              style={[
+                s.texteOnglet,
+                ongletActif === 'paroles' &&
+                  s.texteOngletSelectionne,
+              ]}
+            >
+              Paroles
+            </Text>
+          </TouchableOpacity>
 
-      <View style={s.section}>
-        <Text style={s.titreSection}>PARTITION</Text>
-        <Text style={s.texteSecondaire}>
-          {chant.partition_uri
-            ? 'Une partition est enregistrée pour ce chant.'
-            : 'Aucune partition enregistrée pour ce chant.'}
-        </Text>
-      </View>
+          <TouchableOpacity
+            style={[
+              s.onglet,
+              ongletActif === 'partition' && s.ongletSelectionne,
+            ]}
+            onPress={() => setOngletActif('partition')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: ongletActif === 'partition' }}
+          >
+            <Text style={s.iconeOnglet}>♬</Text>
+            <Text
+              style={[
+                s.texteOnglet,
+                ongletActif === 'partition' &&
+                  s.texteOngletSelectionne,
+              ]}
+            >
+              Partition
+            </Text>
+          </TouchableOpacity>
 
-      <View style={s.section}>
-        <Text style={s.titreSection}>VERSETS BIBLIQUES</Text>
+          <TouchableOpacity
+            style={[
+              s.onglet,
+              ongletActif === 'versets' && s.ongletSelectionne,
+            ]}
+            onPress={() => setOngletActif('versets')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: ongletActif === 'versets' }}
+          >
+            <Text style={s.iconeOnglet}>✝</Text>
+            <Text
+              style={[
+                s.texteOnglet,
+                ongletActif === 'versets' &&
+                  s.texteOngletSelectionne,
+              ]}
+            >
+              Versets
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-        {chant.versets.length > 0 ? (
-          chant.versets.map((verset) => (
-            <View key={verset.id} style={s.carteVerset}>
-              <Text style={s.reference}>{verset.reference_biblique}</Text>
-              <Text style={s.texteVerset}>{verset.texte}</Text>
-            </View>
-          ))
-        ) : (
-          <Text style={s.texteSecondaire}>
-            Aucun verset biblique enregistré pour ce chant.
-          </Text>
-        )}
+        {/* Contenu de l'onglet sélectionné */}
+        <View style={s.contenuOnglet}>
+          {ongletActif === 'paroles' && (
+            <>
+              <Text style={s.titreSection}>
+                PAROLES DU CHANT
+              </Text>
+
+              <Text style={s.paroles}>
+                {chant.paroles?.trim() ||
+                  'Aucune parole enregistrée pour ce chant.'}
+              </Text>
+            </>
+          )}
+
+          {ongletActif === 'partition' && (
+            <>
+              <Text style={s.titreSection}>
+                PARTITION MUSICALE
+              </Text>
+
+              {chant.partition_uri ? (
+                <View style={s.messageDisponible}>
+                  <Text style={s.iconeDisponible}>♫</Text>
+                  <Text style={s.texteDescription}>
+                    Une partition est enregistrée pour ce chant.
+                  </Text>
+                  <Text style={s.texteAide}>
+                    L’affichage du fichier sera ajouté dans une
+                    prochaine étape.
+                  </Text>
+                </View>
+              ) : (
+                <Text style={s.texteDescription}>
+                  Aucune partition enregistrée pour ce chant.
+                </Text>
+              )}
+            </>
+          )}
+
+          {ongletActif === 'versets' && (
+            <>
+              <Text style={s.titreSection}>
+                VERSETS BIBLIQUES
+              </Text>
+
+              {chant.versets.length > 0 ? (
+                chant.versets.map((verset) => (
+                  <View
+                    key={verset.id}
+                    style={s.carteVerset}
+                  >
+                    <Text style={s.reference}>
+                      {verset.reference_biblique ||
+                        'Référence biblique'}
+                    </Text>
+
+                    <Text style={s.texteVerset}>
+                      {verset.texte}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={s.texteDescription}>
+                  Aucun verset biblique enregistré pour ce chant.
+                </Text>
+              )}
+            </>
+          )}
+        </View>
       </View>
     </ScrollView>
   );
@@ -268,6 +476,13 @@ const s = StyleSheet.create({
     color: C.or,
     fontSize: 90,
   },
+  textePochette: {
+    color: C.secondaire,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 3,
+    marginTop: -12,
+  },
   titre: {
     color: C.ivoire,
     fontSize: 26,
@@ -283,43 +498,81 @@ const s = StyleSheet.create({
   },
   carteLecteur: {
     backgroundColor: C.carte,
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 20,
-    marginBottom: 24,
+    marginBottom: 28,
+    borderWidth: 1,
+    borderColor: '#354763',
   },
-  titreSection: {
-    color: C.or,
-    fontSize: 13,
+  enteteLecteur: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  titreLecteur: {
+    color: C.ivoire,
+    fontSize: 17,
     fontWeight: '800',
-    letterSpacing: 1.2,
-    marginBottom: 16,
+  },
+  sousTitreLecteur: {
+    color: C.secondaire,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  iconeEntete: {
+    color: C.or,
+    fontSize: 27,
+  },
+  commandes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    marginTop: 24,
+  },
+  boutonSecondaire: {
+    width: 58,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: '#344762',
+  },
+  iconeSecondaire: {
+    color: C.ivoire,
+    fontSize: 25,
+    fontWeight: '700',
+  },
+  texteSecondaireBouton: {
+    color: C.secondaire,
+    fontSize: 10,
+    marginTop: -2,
   },
   boutonLecture: {
-    alignSelf: 'center',
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: C.or,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 8,
   },
   iconeLecture: {
     color: C.fond,
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 28,
+    fontWeight: '900',
+  },
+  zoneProgression: {
+    marginTop: 24,
   },
   piste: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#43536B',
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: C.piste,
     overflow: 'hidden',
-    marginTop: 18,
   },
   progression: {
     height: '100%',
     backgroundColor: C.or,
-    borderRadius: 3,
+    borderRadius: 4,
   },
   temps: {
     flexDirection: 'row',
@@ -329,29 +582,96 @@ const s = StyleSheet.create({
   texteTemps: {
     color: C.secondaire,
     fontSize: 12,
+    fontVariant: ['tabular-nums'],
   },
-  section: {
-    marginBottom: 24,
+  zoneContenu: {
+    marginBottom: 26,
+  },
+  onglets: {
+    flexDirection: 'row',
+    backgroundColor: C.carte,
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+    marginBottom: 16,
+  },
+  onglet: {
+    flex: 1,
+    minHeight: 58,
+    paddingHorizontal: 2,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ongletSelectionne: {
+    backgroundColor: C.or,
+  },
+  iconeOnglet: {
+    color: C.ivoire,
+    fontSize: 17,
+    marginBottom: 3,
+  },
+  texteOnglet: {
+    color: C.secondaire,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  texteOngletSelectionne: {
+    color: C.fond,
+  },
+  contenuOnglet: {
+    backgroundColor: C.carte,
+    borderRadius: 16,
+    padding: 17,
+    minHeight: 160,
+    borderWidth: 1,
+    borderColor: '#354763',
+  },
+  titreSection: {
+    color: C.or,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: 16,
   },
   paroles: {
     color: C.ivoire,
     fontSize: 16,
     lineHeight: 29,
   },
-  texteSecondaire: {
+  texteDescription: {
     color: C.secondaire,
     fontSize: 14,
     lineHeight: 23,
   },
+  texteAide: {
+    color: C.secondaire,
+    fontSize: 12,
+    lineHeight: 19,
+    marginTop: 12,
+  },
+  messageDisponible: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  iconeDisponible: {
+    color: C.or,
+    fontSize: 35,
+    marginBottom: 12,
+  },
   carteVerset: {
-    backgroundColor: C.carte,
+    backgroundColor: '#1D2C44',
     padding: 16,
     borderRadius: 14,
     marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: C.or,
   },
   reference: {
     color: C.or,
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 14,
     marginBottom: 8,
   },

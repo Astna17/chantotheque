@@ -57,32 +57,38 @@ export async function initDatabase(): Promise<void> {
   `);
 
   
-  // Vérifier les colonnes réellement présentes dans versets.
+  // Lire les colonnes actuelles de la table versets.
   const colonnes = await db.getAllAsync<{ name: string }>(
     'PRAGMA table_info(versets);'
   );
 
   const nomsColonnes = colonnes.map((colonne) => colonne.name);
 
-  // Ajouter les colonnes manquantes.
+  // Ajouter les colonnes nécessaires si elles sont absentes.
   if (!nomsColonnes.includes('chant_id')) {
     await db.execAsync(`
-      ALTER TABLE versets
-      ADD COLUMN chant_id INTEGER;
+      ALTER TABLE versets ADD COLUMN chant_id INTEGER;
     `);
   }
 
   if (!nomsColonnes.includes('reference_biblique')) {
     await db.execAsync(`
-      ALTER TABLE versets
-      ADD COLUMN reference_biblique TEXT;
+      ALTER TABLE versets ADD COLUMN reference_biblique TEXT;
     `);
   }
 
   if (!nomsColonnes.includes('texte')) {
     await db.execAsync(`
-      ALTER TABLE versets
-      ADD COLUMN texte TEXT;
+      ALTER TABLE versets ADD COLUMN texte TEXT;
+    `);
+  }
+
+  // Récupérer les anciennes références bibliques.
+  if (nomsColonnes.includes('reference')) {
+    await db.execAsync(`
+      UPDATE versets
+      SET reference_biblique = reference
+      WHERE reference_biblique IS NULL;
     `);
   }
 
