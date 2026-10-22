@@ -1,4 +1,3 @@
-
 import { getDatabase } from './init';
 
 export type Chant = {
@@ -14,6 +13,11 @@ export type Chant = {
   date_modification: string;
 };
 
+export type VersetSaisie = {
+  reference: string;
+  texte: string;
+};
+
 export async function obtenirChants(): Promise<Chant[]> {
   const db = await getDatabase();
 
@@ -24,34 +28,59 @@ export async function obtenirChants(): Promise<Chant[]> {
   `);
 }
 
-export async function ajouterChant(
-  titre: string,
-  audioUri: string,
-  auteur?: string,
-  imageUri?: string,
-  paroles?: string,
-  partitionUri?: string,
+export async function ajouterChantComplet(
+  chant: {
+    titre: string;
+    auteur: string;
+    audio_uri: string;
+    image_uri: string | null;
+    paroles: string;
+    partition_uri: string | null;
+  },
+  versets: VersetSaisie[],
 ): Promise<number> {
   const db = await getDatabase();
+  let nouvelId = 0;
 
-  const resultat = await db.runAsync(
-    `INSERT INTO chants (
-      titre,
-      auteur,
-      audio_uri,
-      image_uri,
-      paroles,
-      partition_uri
-    ) VALUES (?, ?, ?, ?, ?, ?);`,
-    titre.trim(),
-    auteur?.trim() || null,
-    audioUri,
-    imageUri ?? null,
-    paroles ?? null,
-    partitionUri ?? null,
-  );
+  await db.withTransactionAsync(async () => {
+    const resultat = await db.runAsync(
+      `INSERT INTO chants (
+        titre,
+        auteur,
+        audio_uri,
+        image_uri,
+        paroles,
+        partition_uri
+      ) VALUES (?, ?, ?, ?, ?, ?);`,
+      chant.titre.trim(),
+      chant.auteur.trim() || null,
+      chant.audio_uri,
+      chant.image_uri,
+      chant.paroles.trim() || null,
+      chant.partition_uri,
+    );
 
-  return resultat.lastInsertRowId;
+    nouvelId = resultat.lastInsertRowId;
+
+    for (const verset of versets) {
+      if (!verset.reference.trim() || !verset.texte.trim()) {
+        continue;
+      }
+
+      await db.runAsync(
+        `INSERT INTO versets (
+          chant_id,
+          reference_biblique,
+          texte
+        ) VALUES (?, ?, ?);`,
+        nouvelId,
+        verset.reference.trim(),
+        verset.texte.trim(),
+      );
+    }
+  });
+
+  return nouvelId;
 }
 
 export async function changerFavori(
