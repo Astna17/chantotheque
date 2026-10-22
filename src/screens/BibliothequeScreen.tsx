@@ -4,6 +4,7 @@ import {
   View,
   Text,
   TextInput,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -43,7 +44,8 @@ export default function BibliothequeScreen({
 
   const chargerChants = useCallback(async () => {
     try {
-      setChants(await obtenirChants());
+      const resultat = await obtenirChants();
+      setChants(resultat);
     } catch (error) {
       console.error('Erreur de chargement des chants :', error);
       Alert.alert('Erreur', 'Impossible de charger les chants.');
@@ -81,21 +83,47 @@ export default function BibliothequeScreen({
 
   return (
     <View style={s.container}>
-      <ScrollView contentContainerStyle={s.contenu}>
+      <ScrollView
+        contentContainerStyle={s.contenu}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* En-tête */}
         <Text style={s.surtitre}>VOTRE ESPACE MUSICAL</Text>
+
         <Text style={s.titre}>Ma bibliothèque</Text>
+
         <Text style={s.description}>
           Retrouvez vos chants de louange.
         </Text>
 
-        <TextInput
-          style={s.recherche}
-          placeholder="Rechercher un chant ou un auteur..."
-          placeholderTextColor="#9AA7BC"
-          value={recherche}
-          onChangeText={setRecherche}
-        />
+        {/* Recherche */}
+        <View style={s.zoneRecherche}>
+          <Text style={s.iconeRecherche}>⌕</Text>
 
+          <TextInput
+            style={s.recherche}
+            placeholder="Rechercher un chant ou un auteur..."
+            placeholderTextColor="#9AA7BC"
+            value={recherche}
+            onChangeText={setRecherche}
+            returnKeyType="search"
+            accessibilityLabel="Rechercher un chant ou un auteur"
+          />
+
+          {recherche.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setRecherche('')}
+              style={s.effacerRecherche}
+              accessibilityRole="button"
+              accessibilityLabel="Effacer la recherche"
+            >
+              <Text style={s.texteEffacer}>×</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Filtres */}
         <View style={s.onglets}>
           {(['Tous', 'Mes chants', 'Favoris'] as Onglet[]).map(
             (item) => (
@@ -106,6 +134,8 @@ export default function BibliothequeScreen({
                   onglet === item && s.ongletActif,
                 ]}
                 onPress={() => setOnglet(item)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: onglet === item }}
               >
                 <Text
                   style={[
@@ -120,10 +150,12 @@ export default function BibliothequeScreen({
           )}
         </View>
 
+        {/* En-tête de la liste */}
         <View style={s.enteteListe}>
           <Text style={s.sousTitre}>
             {onglet === 'Favoris' ? 'Mes favoris' : 'Mes chants'}
           </Text>
+
           <Text style={s.compteur}>
             {chargement
               ? 'Chargement...'
@@ -131,6 +163,7 @@ export default function BibliothequeScreen({
           </Text>
         </View>
 
+        {/* Chargement */}
         {chargement ? (
           <ActivityIndicator
             color={C.or}
@@ -138,8 +171,11 @@ export default function BibliothequeScreen({
             style={s.indicateur}
           />
         ) : filtres.length === 0 ? (
+          /* Bibliothèque vide */
           <View style={s.vide}>
-            <Text style={s.iconeVide}>♫</Text>
+            <View style={s.iconeVideConteneur}>
+              <Text style={s.iconeVide}>♫</Text>
+            </View>
 
             <Text style={s.texteVide}>
               {recherche
@@ -152,10 +188,25 @@ export default function BibliothequeScreen({
             <Text style={s.aideVide}>
               {recherche
                 ? 'Essayez un autre titre ou auteur.'
-                : 'Ajoutez votre premier chant pour commencer.'}
+                : onglet === 'Favoris'
+                  ? 'Ajoutez des chants à vos favoris avec l’étoile.'
+                  : 'Ajoutez votre premier chant pour commencer.'}
             </Text>
+
+            {!recherche && onglet !== 'Favoris' && (
+              <TouchableOpacity
+                style={s.boutonVide}
+                onPress={onAjouter}
+                activeOpacity={0.8}
+              >
+                <Text style={s.texteBoutonVide}>
+                  ＋ Ajouter un chant
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
+          /* Liste des chants */
           filtres.map((chant) => (
             <View key={chant.id} style={s.carte}>
               <TouchableOpacity
@@ -165,10 +216,25 @@ export default function BibliothequeScreen({
                 accessibilityRole="button"
                 accessibilityLabel={`Ouvrir ${chant.titre}`}
               >
+                {/* Couverture du chant */}
                 <View style={s.pochette}>
-                  <Text style={s.iconeMusique}>♫</Text>
+                  {chant.image_uri ? (
+                    <Image
+                      source={{ uri: chant.image_uri }}
+                      style={s.imagePochette}
+                      resizeMode="cover"
+                      onError={() => {
+                        console.warn(
+                          `Impossible de charger la couverture du chant : ${chant.titre}`,
+                        );
+                      }}
+                    />
+                  ) : (
+                    <Text style={s.iconeMusique}>♫</Text>
+                  )}
                 </View>
 
+                {/* Informations */}
                 <View style={s.informations}>
                   <Text style={s.titreChant} numberOfLines={2}>
                     {chant.titre}
@@ -184,6 +250,7 @@ export default function BibliothequeScreen({
                 </View>
               </TouchableOpacity>
 
+              {/* Favori */}
               <TouchableOpacity
                 style={s.boutonFavori}
                 onPress={() => basculerFavori(chant)}
@@ -203,12 +270,16 @@ export default function BibliothequeScreen({
         )}
       </ScrollView>
 
+      {/* Bouton fixe d'ajout */}
       <TouchableOpacity
         style={s.boutonAjouter}
         onPress={onAjouter}
         activeOpacity={0.85}
+        accessibilityRole="button"
       >
-        <Text style={s.texteBouton}>＋  Ajouter un chant</Text>
+        <Text style={s.texteBouton}>
+          ＋  Ajouter un chant
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -222,7 +293,7 @@ const s = StyleSheet.create({
   contenu: {
     padding: 22,
     paddingTop: 60,
-    paddingBottom: 110,
+    paddingBottom: 120,
   },
   surtitre: {
     color: C.or,
@@ -242,12 +313,33 @@ const s = StyleSheet.create({
     marginTop: 8,
     marginBottom: 24,
   },
-  recherche: {
+  zoneRecherche: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: C.carte,
-    color: C.ivoire,
     borderRadius: 14,
-    padding: 16,
+    paddingHorizontal: 14,
+    minHeight: 54,
+  },
+  iconeRecherche: {
+    color: C.secondaire,
+    fontSize: 25,
+    marginRight: 8,
+  },
+  recherche: {
+    flex: 1,
+    minWidth: 0,
+    color: C.ivoire,
+    paddingVertical: 15,
     fontSize: 14,
+  },
+  effacerRecherche: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  texteEffacer: {
+    color: C.secondaire,
+    fontSize: 24,
   },
   onglets: {
     flexDirection: 'row',
@@ -258,6 +350,7 @@ const s = StyleSheet.create({
   onglet: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 12,
     borderRadius: 12,
     backgroundColor: C.carte,
@@ -295,6 +388,8 @@ const s = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#354763',
   },
   zoneChant: {
     flex: 1,
@@ -303,12 +398,18 @@ const s = StyleSheet.create({
     minWidth: 0,
   },
   pochette: {
-    width: 58,
-    height: 58,
+    width: 64,
+    height: 64,
     borderRadius: 12,
     backgroundColor: C.fond,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  imagePochette: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
   },
   iconeMusique: {
     color: C.or,
@@ -338,18 +439,30 @@ const s = StyleSheet.create({
   boutonFavori: {
     paddingLeft: 10,
     paddingVertical: 8,
+    minWidth: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   favori: {
     color: C.or,
     fontSize: 25,
-    paddingHorizontal: 4,
   },
   indicateur: {
     marginTop: 40,
   },
   vide: {
     alignItems: 'center',
+    paddingHorizontal: 15,
     paddingVertical: 48,
+  },
+  iconeVideConteneur: {
+    width: 88,
+    height: 88,
+    borderRadius: 28,
+    backgroundColor: C.carte,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   iconeVide: {
     color: C.or,
@@ -369,6 +482,18 @@ const s = StyleSheet.create({
     lineHeight: 21,
     marginTop: 8,
   },
+  boutonVide: {
+    backgroundColor: C.or,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 22,
+  },
+  texteBoutonVide: {
+    color: C.fond,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   boutonAjouter: {
     position: 'absolute',
     bottom: 24,
@@ -378,6 +503,7 @@ const s = StyleSheet.create({
     paddingVertical: 17,
     borderRadius: 16,
     alignItems: 'center',
+    elevation: 5,
   },
   texteBouton: {
     color: C.fond,
