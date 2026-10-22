@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -39,7 +40,9 @@ export default function DetailChantScreen({
   const [chant, setChant] = useState<ChantDetail | null>(null);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(false);
+  const [imageIndisponible, setImageIndisponible] = useState(false);
   const [ongletActif, setOngletActif] = useState<Onglet>('paroles');
+  const [largeurPiste, setLargeurPiste] = useState(0);
 
   const player = useAudioPlayer(null);
   const statut = useAudioPlayerStatus(player);
@@ -51,6 +54,7 @@ export default function DetailChantScreen({
       try {
         setChargement(true);
         setErreur(false);
+        setImageIndisponible(false);
 
         const resultat = await obtenirChantParId(chantId);
 
@@ -60,9 +64,14 @@ export default function DetailChantScreen({
         }
       } catch (error) {
         console.error('Erreur de chargement du chant :', error);
-        if (actif) setErreur(true);
+
+        if (actif) {
+          setErreur(true);
+        }
       } finally {
-        if (actif) setChargement(false);
+        if (actif) {
+          setChargement(false);
+        }
       }
     }
 
@@ -80,6 +89,7 @@ export default function DetailChantScreen({
       player.replace({ uri: chant.audio_uri });
     } catch (error) {
       console.error('Erreur de préparation audio :', error);
+
       Alert.alert(
         'Audio indisponible',
         'Le fichier audio ne peut pas être chargé.',
@@ -94,7 +104,10 @@ export default function DetailChantScreen({
       if (statut.playing) {
         player.pause();
       } else {
-        if (statut.duration > 0 && statut.currentTime >= statut.duration) {
+        if (
+          statut.duration > 0 &&
+          statut.currentTime >= statut.duration
+        ) {
           player.seekTo(0);
         }
 
@@ -102,6 +115,7 @@ export default function DetailChantScreen({
       }
     } catch (error) {
       console.error('Erreur du lecteur audio :', error);
+
       Alert.alert(
         'Lecture impossible',
         'Impossible de lire ce fichier audio.',
@@ -111,6 +125,7 @@ export default function DetailChantScreen({
 
   function deplacerLecture(secondes: number) {
     const duree = statut.duration || 0;
+
     if (duree <= 0) return;
 
     const position = Math.max(
@@ -119,6 +134,23 @@ export default function DetailChantScreen({
     );
 
     player.seekTo(position);
+  }
+
+  function choisirPosition(event: {
+    nativeEvent: { locationX: number };
+  }) {
+    const duree = statut.duration || 0;
+
+    if (duree <= 0 || largeurPiste <= 0) return;
+
+    const positionX = Math.max(
+      0,
+      Math.min(event.nativeEvent.locationX, largeurPiste),
+    );
+
+    const nouvellePosition = (positionX / largeurPiste) * duree;
+
+    player.seekTo(nouvellePosition);
   }
 
   function formaterTemps(secondes: number) {
@@ -153,6 +185,7 @@ export default function DetailChantScreen({
         <TouchableOpacity
           style={s.boutonRetour}
           onPress={onRetour}
+          accessibilityRole="button"
         >
           <Text style={s.texteBoutonRetour}>
             ‹ Retour à la bibliothèque
@@ -164,9 +197,9 @@ export default function DetailChantScreen({
 
   const duree = statut.duration || 0;
   const temps = statut.currentTime || 0;
-
-  const progression =
-    duree > 0 ? Math.min(temps / duree, 1) : 0;
+  const progression = duree > 0
+    ? Math.max(0, Math.min(temps / duree, 1))
+    : 0;
 
   return (
     <ScrollView
@@ -174,26 +207,43 @@ export default function DetailChantScreen({
       contentContainerStyle={s.contenu}
       showsVerticalScrollIndicator={false}
     >
-      {/* Navigation retour */}
+      {/* Navigation */}
       <TouchableOpacity
         onPress={onRetour}
         style={s.retour}
         accessibilityRole="button"
       >
-        <Text style={s.texteRetour}>
-          ‹  Bibliothèque
-        </Text>
+        <Text style={s.texteRetour}>‹ Bibliothèque</Text>
       </TouchableOpacity>
 
-      {/* Pochette du chant */}
+      {/* Couverture */}
       <View style={s.pochette}>
-        <Text style={s.iconeMusique}>♫</Text>
-        <Text style={s.textePochette}>
-          CHANTOTHÈQUE
-        </Text>
+        {chant.image_uri && !imageIndisponible ? (
+          <Image
+            source={{ uri: chant.image_uri }}
+            style={s.imagePochette}
+            resizeMode="cover"
+            onError={() => {
+              console.warn(
+                'Impossible de charger la couverture :',
+                chant.titre,
+              );
+              setImageIndisponible(true);
+            }}
+          />
+        ) : (
+          <View style={s.pochetteParDefaut}>
+            <Text style={s.iconeMusique}>♫</Text>
+            <Text style={s.textePochette}>CHANTOTHÈQUE</Text>
+          </View>
+        )}
+
+        <View style={s.badgeCouverture}>
+          <Text style={s.texteBadgeCouverture}>♫ CHANT</Text>
+        </View>
       </View>
 
-      {/* Informations du chant */}
+      {/* Informations */}
       <Text style={s.titre}>{chant.titre}</Text>
 
       <Text style={s.auteur}>
@@ -204,9 +254,7 @@ export default function DetailChantScreen({
       <View style={s.carteLecteur}>
         <View style={s.enteteLecteur}>
           <View>
-            <Text style={s.titreLecteur}>
-              Lecteur audio
-            </Text>
+            <Text style={s.titreLecteur}>Lecteur audio</Text>
             <Text style={s.sousTitreLecteur}>
               Écoute ton chant
             </Text>
@@ -215,6 +263,7 @@ export default function DetailChantScreen({
           <Text style={s.iconeEntete}>♫</Text>
         </View>
 
+        {/* Commandes */}
         <View style={s.commandes}>
           <TouchableOpacity
             style={s.boutonSecondaire}
@@ -223,9 +272,7 @@ export default function DetailChantScreen({
             accessibilityLabel="Reculer de 10 secondes"
           >
             <Text style={s.iconeSecondaire}>↶</Text>
-            <Text style={s.texteSecondaireBouton}>
-              10 s
-            </Text>
+            <Text style={s.texteSecondaireBouton}>10 s</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -248,22 +295,48 @@ export default function DetailChantScreen({
             accessibilityLabel="Avancer de 10 secondes"
           >
             <Text style={s.iconeSecondaire}>↷</Text>
-            <Text style={s.texteSecondaireBouton}>
-              10 s
-            </Text>
+            <Text style={s.texteSecondaireBouton}>10 s</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Progression audio */}
+        {/* Barre de progression interactive */}
         <View style={s.zoneProgression}>
-          <View style={s.piste}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={s.zoneTactile}
+            onLayout={(event) => {
+              setLargeurPiste(event.nativeEvent.layout.width);
+            }}
+            onPress={choisirPosition}
+            disabled={duree <= 0}
+            accessibilityRole="adjustable"
+            accessibilityLabel="Position de lecture"
+            accessibilityValue={{
+              min: 0,
+              max: Math.floor(duree),
+              now: Math.floor(temps),
+            }}
+          >
+            <View style={s.piste}>
+              <View
+                style={[
+                  s.progression,
+                  { width: `${progression * 100}%` },
+                ]}
+              />
+            </View>
+
             <View
+              pointerEvents="none"
               style={[
-                s.progression,
-                { width: `${progression * 100}%` },
+                s.boutonCurseur,
+                {
+                  left: `${progression * 100}%`,
+                  opacity: duree > 0 ? 1 : 0,
+                },
               ]}
             />
-          </View>
+          </TouchableOpacity>
 
           <View style={s.temps}>
             <Text style={s.texteTemps}>
@@ -274,10 +347,14 @@ export default function DetailChantScreen({
               {formaterTemps(duree)}
             </Text>
           </View>
+
+          <Text style={s.conseilProgression}>
+            Touche la barre pour changer de passage
+          </Text>
         </View>
       </View>
 
-      {/* Onglets horizontaux */}
+      {/* Onglets */}
       <View style={s.zoneContenu}>
         <View style={s.onglets}>
           <TouchableOpacity
@@ -287,14 +364,22 @@ export default function DetailChantScreen({
             ]}
             onPress={() => setOngletActif('paroles')}
             accessibilityRole="button"
-            accessibilityState={{ selected: ongletActif === 'paroles' }}
+            accessibilityState={{
+              selected: ongletActif === 'paroles',
+            }}
           >
-            <Text style={s.iconeOnglet}>♫</Text>
+            <Text
+              style={[
+                s.iconeOnglet,
+                ongletActif === 'paroles' && s.iconeOngletSelectionne,
+              ]}
+            >
+              ♫
+            </Text>
             <Text
               style={[
                 s.texteOnglet,
-                ongletActif === 'paroles' &&
-                  s.texteOngletSelectionne,
+                ongletActif === 'paroles' && s.texteOngletSelectionne,
               ]}
             >
               Paroles
@@ -308,14 +393,22 @@ export default function DetailChantScreen({
             ]}
             onPress={() => setOngletActif('partition')}
             accessibilityRole="button"
-            accessibilityState={{ selected: ongletActif === 'partition' }}
+            accessibilityState={{
+              selected: ongletActif === 'partition',
+            }}
           >
-            <Text style={s.iconeOnglet}>♬</Text>
+            <Text
+              style={[
+                s.iconeOnglet,
+                ongletActif === 'partition' && s.iconeOngletSelectionne,
+              ]}
+            >
+              ♬
+            </Text>
             <Text
               style={[
                 s.texteOnglet,
-                ongletActif === 'partition' &&
-                  s.texteOngletSelectionne,
+                ongletActif === 'partition' && s.texteOngletSelectionne,
               ]}
             >
               Partition
@@ -329,14 +422,22 @@ export default function DetailChantScreen({
             ]}
             onPress={() => setOngletActif('versets')}
             accessibilityRole="button"
-            accessibilityState={{ selected: ongletActif === 'versets' }}
+            accessibilityState={{
+              selected: ongletActif === 'versets',
+            }}
           >
-            <Text style={s.iconeOnglet}>✝</Text>
+            <Text
+              style={[
+                s.iconeOnglet,
+                ongletActif === 'versets' && s.iconeOngletSelectionne,
+              ]}
+            >
+              ✝
+            </Text>
             <Text
               style={[
                 s.texteOnglet,
-                ongletActif === 'versets' &&
-                  s.texteOngletSelectionne,
+                ongletActif === 'versets' && s.ongletSelectionne,
               ]}
             >
               Versets
@@ -344,14 +445,11 @@ export default function DetailChantScreen({
           </TouchableOpacity>
         </View>
 
-        {/* Contenu de l'onglet sélectionné */}
+        {/* Contenu des onglets */}
         <View style={s.contenuOnglet}>
           {ongletActif === 'paroles' && (
             <>
-              <Text style={s.titreSection}>
-                PAROLES DU CHANT
-              </Text>
-
+              <Text style={s.titreSection}>PAROLES DU CHANT</Text>
               <Text style={s.paroles}>
                 {chant.paroles?.trim() ||
                   'Aucune parole enregistrée pour ce chant.'}
@@ -361,9 +459,7 @@ export default function DetailChantScreen({
 
           {ongletActif === 'partition' && (
             <>
-              <Text style={s.titreSection}>
-                PARTITION MUSICALE
-              </Text>
+              <Text style={s.titreSection}>PARTITION MUSICALE</Text>
 
               {chant.partition_uri ? (
                 <View style={s.messageDisponible}>
@@ -372,8 +468,8 @@ export default function DetailChantScreen({
                     Une partition est enregistrée pour ce chant.
                   </Text>
                   <Text style={s.texteAide}>
-                    L’affichage du fichier sera ajouté dans une
-                    prochaine étape.
+                    L’affichage du fichier de partition sera ajouté
+                    dans une prochaine étape.
                   </Text>
                 </View>
               ) : (
@@ -386,24 +482,15 @@ export default function DetailChantScreen({
 
           {ongletActif === 'versets' && (
             <>
-              <Text style={s.titreSection}>
-                VERSETS BIBLIQUES
-              </Text>
+              <Text style={s.titreSection}>VERSETS BIBLIQUES</Text>
 
               {chant.versets.length > 0 ? (
                 chant.versets.map((verset) => (
-                  <View
-                    key={verset.id}
-                    style={s.carteVerset}
-                  >
+                  <View key={verset.id} style={s.carteVerset}>
                     <Text style={s.reference}>
-                      {verset.reference_biblique ||
-                        'Référence biblique'}
+                      {verset.reference_biblique || 'Référence biblique'}
                     </Text>
-
-                    <Text style={s.texteVerset}>
-                      {verset.texte}
-                    </Text>
+                    <Text style={s.texteVerset}>{verset.texte}</Text>
                   </View>
                 ))
               ) : (
@@ -462,8 +549,10 @@ const s = StyleSheet.create({
     color: C.or,
     fontWeight: '600',
   },
+
+  /* Couverture */
   pochette: {
-    height: 210,
+    height: 260,
     borderRadius: 24,
     backgroundColor: C.carte,
     alignItems: 'center',
@@ -471,6 +560,18 @@ const s = StyleSheet.create({
     marginBottom: 24,
     borderWidth: 1,
     borderColor: '#3A4D69',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  imagePochette: {
+    width: '100%',
+    height: '100%',
+  },
+  pochetteParDefaut: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   iconeMusique: {
     color: C.or,
@@ -483,6 +584,23 @@ const s = StyleSheet.create({
     letterSpacing: 3,
     marginTop: -12,
   },
+  badgeCouverture: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(16, 26, 48, 0.85)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+  },
+  texteBadgeCouverture: {
+    color: C.or,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+
+  /* Informations */
   titre: {
     color: C.ivoire,
     fontSize: 26,
@@ -496,6 +614,8 @@ const s = StyleSheet.create({
     marginTop: 8,
     marginBottom: 26,
   },
+
+  /* Lecteur */
   carteLecteur: {
     backgroundColor: C.carte,
     borderRadius: 24,
@@ -563,6 +683,11 @@ const s = StyleSheet.create({
   zoneProgression: {
     marginTop: 24,
   },
+  zoneTactile: {
+    height: 30,
+    justifyContent: 'center',
+    position: 'relative',
+  },
   piste: {
     height: 7,
     borderRadius: 4,
@@ -574,16 +699,35 @@ const s = StyleSheet.create({
     backgroundColor: C.or,
     borderRadius: 4,
   },
+  boutonCurseur: {
+    position: 'absolute',
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    backgroundColor: C.or,
+    borderWidth: 2,
+    borderColor: C.ivoire,
+    top: 7.5,
+    marginLeft: -7.5,
+  },
   temps: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: 4,
   },
   texteTemps: {
     color: C.secondaire,
     fontSize: 12,
     fontVariant: ['tabular-nums'],
   },
+  conseilProgression: {
+    color: C.secondaire,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 12,
+  },
+
+  /* Onglets */
   zoneContenu: {
     marginBottom: 26,
   },
@@ -612,6 +756,9 @@ const s = StyleSheet.create({
     fontSize: 17,
     marginBottom: 3,
   },
+  iconeOngletSelectionne: {
+    color: C.fond,
+  },
   texteOnglet: {
     color: C.secondaire,
     fontSize: 11,
@@ -621,6 +768,8 @@ const s = StyleSheet.create({
   texteOngletSelectionne: {
     color: C.fond,
   },
+
+  /* Contenu des onglets */
   contenuOnglet: {
     backgroundColor: C.carte,
     borderRadius: 16,
@@ -661,6 +810,8 @@ const s = StyleSheet.create({
     fontSize: 35,
     marginBottom: 12,
   },
+
+  /* Versets */
   carteVerset: {
     backgroundColor: '#1D2C44',
     padding: 16,
